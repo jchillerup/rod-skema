@@ -11,6 +11,10 @@ class ShiftSlot:
     ends = None
     needs_driver = False
 
+    def collides_with(self, candidate):
+        # https://stackoverflow.com/questions/325933/determine-whether-two-date-ranges-overlap
+        return (max(self.starts, candidate.starts) < min(self.ends, candidate.ends))
+    
     def __init__(self, gdocs_line):
         self.type = gdocs_line[0]
         self.num_people = int(gdocs_line[1])

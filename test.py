@@ -21,29 +21,25 @@ for shift in shifts:
     solver.Add(solver.AllDifferent(local_slots))
     slots.extend(local_slots)
 
-    # når vi laver slots udfra en spec over stævnet, så tilføj constraints
-    # med det samme så vi ikke får de samme hjælpere i samtidige slots
-    # evt. AllDifferent for slots der overlapper i tid
+    # In a minute we'll need to access the slots of this shift, so let's put
+    # them somewhere where we can find them.
+    shift.slots = local_slots
 
 
-# ### Hard constraints:
-# Ikke to steder samtidig
-# Ikke mere end seks timers sammenhængende arbejde (eller bare to vagter lige efter hinanden)
-# Lige meget arbejde til alle (afhængigt af antal dage på stævnet)
-# Ikke arbejde på et tidspunkt, hvor man ikke er på stævnet
-# Mindst x timers pause efter en vagt
-# Ædruvagt skal have kørekort
-
-# Sørg for at hårdt constrainede frivillige i hvert fald får noget arbejde!
-
-# ### Soft constriants:
-# En fridag til hver frivillig
-# Tag højde for ønsker ifht. arbejdstid og arbejdstype
-
-#solver.Add(slots[0] < slots[1])
-#solver.Add(slots[1] < slots[2])
-#solver.Add(slots[2] < slots[3])
-#solver.Add(slots[3] < slots[4])
+# Make sure we're not assigning the same people to overlapping shifts (one cannot work
+# both in the bar and the kitchen at the same time)
+for shift in shifts:
+    for collision_candidate in shifts:
+        if shift.collides_with(collision_candidate) and shift != collision_candidate:
+            print("%s collides with %s" % (shift,collision_candidate))
+            
+            # We have two shifts that collide. We need different volunteers for *all*
+            # the slots in those periods
+            local_slots = []
+            local_slots.extend(shift.slots)
+            local_slots.extend(collision_candidate.slots)
+            
+            solver.Add(solver.AllDifferent(local_slots))
 
 # decision builder
 db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
