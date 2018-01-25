@@ -1,4 +1,6 @@
 import csv
+from datetime import datetime
+from model import Volunteer, ShiftSlot
 
 def resolve_driver(i):
     if i == "Ja": return 1
@@ -35,7 +37,6 @@ def resolve_driver_choices(i):
     if i == "Jeg har ikke kørekort": return 0
 
     return -1
-    
 
 # 20,21,22,23
 def resolve_shift_type_choices(i):
@@ -45,31 +46,39 @@ def resolve_shift_type_choices(i):
     if i == "Det vil jeg meget gerne undgå": return 0
     return -1
 
+def csv_streamer(filename):
+    with open(filename, 'r') as csvfile:
+        reader = csv.reader(csvfile, delimiter=",", quotechar="\"")
 
-with open('frivillige.csv', 'r') as csvfile:
-    reader = csv.reader(csvfile, delimiter=",", quotechar="\"")
+        first_line = True
+        for line in reader:
+            if first_line:
+                first_line = False
+                continue
 
-    first_line = True
-    for line in reader:
-        
-        if first_line:
-            first_line = False
-            continue
-            
-        name = line[1]
-        driver = resolve_driver(line[8])
-        has_car = resolve_has_car(line[9])
+            yield(line)
 
-        sober_day = resolve_driver_choices(line[17])
-        sober_sleeping_night = resolve_driver_choices(line[18])
-        sober_wake_night = resolve_driver_choices(line[19])
+for line in csv_streamer('frivillige.csv'):
+    name = line[1]
+    driver = resolve_driver(line[8])
+    has_car = resolve_has_car(line[9])
+    
+    sober_day = resolve_driver_choices(line[17])
+    sober_sleeping_night = resolve_driver_choices(line[18])
+    sober_wake_night = resolve_driver_choices(line[19])
+    
+    late_night = resolve_shift_type_choices(line[20])
+    kitchen = resolve_shift_type_choices(line[21])
+    bar = resolve_shift_type_choices(line[22])
+    high_tempo = resolve_shift_type_choices(line[23])
         
-        late_night = resolve_shift_type_choices(line[20])
-        kitchen = resolve_shift_type_choices(line[21])
-        bar = resolve_shift_type_choices(line[22])
-        high_tempo = resolve_shift_type_choices(line[23])
-        
-        print(name)
-#       print(resolve_times(line[11]))
-#       print(sober_day, sober_sleeping_night, sober_wake_night)
-#       print(late_night, kitchen, bar, high_tempo)
+    print(name)
+    # print(resolve_times(line[11]))
+    # print(sober_day, sober_sleeping_night, sober_wake_night)
+    # print(late_night, kitchen, bar, high_tempo)
+
+for line in csv_streamer('tjanser.csv'):
+    title, num_people, starts, ends, needs_license = line
+
+    print(ShiftSlot(line))
+    

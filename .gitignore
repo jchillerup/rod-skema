@@ -1,6 +1,7 @@
 *~
 \#*\#
-frivillige.csv
+*.csv
+*.txt
 nurse_rostering.py
 v/
 
