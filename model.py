@@ -58,7 +58,7 @@ class Volunteer:
         if "Fredag d. 30/3" in times: out.append(7)
         if "Nedtagningsvagt fredag d. 30/3 til lørdag d. 31/3: Nedtagning af ROD fra fredag eftermiddag til lørdag ved middagstid. (Der er mulighed for at aftale afgangstidspunkt lørdag med arbejdsgruppen)." in times: out.append(8)
     
-        return(out)
+        return out
 
     # 17,18,19
     def resolve_driver_choices(self, i):

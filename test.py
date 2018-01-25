@@ -9,10 +9,8 @@ volunteers = get_volunteers_from_csv()
 shifts = get_shifts_from_csv()
 slots = []
 
-# A shift has a slot per person needed
+# Make a slot for each person needed for a shift
 for shift in shifts:
-    # Make a slot for each person needed for a shift
-
     local_slots = []
     for i in range(shift.num_people):
         local_slots.append(solver.IntVar(0, len(volunteers)-1, str(shift)))
@@ -31,7 +29,7 @@ for shift in shifts:
 for shift in shifts:
     for collision_candidate in shifts:
         if shift.collides_with(collision_candidate) and shift != collision_candidate:
-            print("%s collides with %s" % (shift,collision_candidate))
+            # print("%s collides with %s" % (shift,collision_candidate))
             
             # We have two shifts that collide. We need different volunteers for *all*
             # the slots in those periods
@@ -40,6 +38,19 @@ for shift in shifts:
             local_slots.extend(collision_candidate.slots)
             
             solver.Add(solver.AllDifferent(local_slots))
+
+
+# Make sure we don't assign shifts to days when a volunteer is not present
+#TODO
+
+# Give volunteers a "cool down period" after a shift
+#TODO
+
+
+
+
+
+
 
 # decision builder
 db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
@@ -51,7 +62,10 @@ while solver.NextSolution():
     count += 1
     print("Solution", count, '\n')
 
-    for slot in slots:
-        print ("%s: %s" % (slot, volunteers[slot.Value()].name))
+    #for slot in slots:
+    #    print ("%s: %s" % (slot, volunteers[slot.Value()].name))
     
 print("Number of solutions:", count)
+
+
+# TODO write a visualizer
