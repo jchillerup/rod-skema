@@ -80,7 +80,7 @@ class Volunteer:
         if i == "Det har jeg det fint med": return 2
         if i == "Det vil jeg helst ikke": return 1
         if i == "Det vil jeg meget gerne undgå": return 0
-        return -1    
+        return -1
 
 
     def __init__(self, gdocs_line):
@@ -96,3 +96,6 @@ class Volunteer:
         kitchen = self.resolve_shift_type_choices(gdocs_line[21])
         bar = self.resolve_shift_type_choices(gdocs_line[22])
         high_tempo = self.resolve_shift_type_choices(gdocs_line[23])
+
+    def __repr__(self):
+        return "<Volunteer: %s>" % self.name
