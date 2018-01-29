@@ -25,6 +25,10 @@ class Shift:
     starts = None
     ends = None
     needs_driver = False
+    is_kitchen = False
+    is_bar = False
+    is_high_tempo = False
+    
     number_of_constraints = 0
 
     def collides_with(self, candidate):
@@ -39,7 +43,11 @@ class Shift:
         self.num_people = int(gdocs_line[1])
         self.starts = parse_datetime(gdocs_line[2])
         self.ends = parse_datetime(gdocs_line[3])
-        self.needs_license = int(gdocs_line[4])
+
+        self.needs_license = bool(int(gdocs_line[4]))
+        self.is_kitchen = bool(int(gdocs_line[5]))
+        self.is_bar = bool(int(gdocs_line[6]))
+        self.is_high_tempo = bool(int(gdocs_line[7]))
 
         if HALF_LOAD:
             self.num_people = self.num_people // 2
@@ -90,7 +98,7 @@ class Volunteer:
         for j in range(len(strings)):
             if strings[j] in times: out.append(j)
 
-        # Shouldn't really be necessary
+        # Shouldn't really be necessary...
         out.sort()
 
         # Special case: the block contains consecutive days:
@@ -114,27 +122,34 @@ class Volunteer:
         return out
 
     # 17,18,19
-    def resolve_driver_choices(self, i):
-        if i == "Det er tiptop": return 4
-        if i == "Det har jeg det okay med": return 3
-        if i == "Det vil jeg helst undgå": return 2
-        if i == "Det har jeg det skidt med": return 1
-        if i == "Jeg har ikke kørekort": return 0
+    def resolve_shift_sobriety_choices(self, i):
+        if i == "Det er tiptop": return 1
+        if i == "Det har jeg det okay med": return 0
+        if i == "Det vil jeg helst undgå": return -1
+        if i == "Det har jeg det skidt med": return -3
+        if i == "Jeg har ikke kørekort": return -10
 
         return -1
 
     # 20,21,22,23
     def resolve_shift_type_choices(self, i):
-        if i == "Det synes jeg er mega fedt!": return 3
-        if i == "Det har jeg det fint med": return 2
-        if i == "Det vil jeg helst ikke": return 1
-        if i == "Det vil jeg meget gerne undgå": return 0
+        if i == "Det synes jeg er mega fedt!": return 1
+        if i == "Det har jeg det fint med": return 0
+        if i == "Det vil jeg helst ikke": return -1
+        if i == "Det vil jeg meget gerne undgå": return -5
         return -1
 
     def consider_shift(self, shift):
+        penalty = 0
 
+        #penalty += shift.is_late_night * self.late_night_penalty
+        penalty += shift.is_kitchen * self.kitchen_penalty
+        penalty += shift.is_bar * self.bar_penalty
+        penalty += shift.is_high_tempo * self.high_tempo_penalty
+        
+        # TODO: Driving constraints?
         # TODO: Working with friends?
-        return -1
+        return penalty
 
 
     def __init__(self, gdocs_line):
@@ -144,16 +159,16 @@ class Volunteer:
 
         self.resolve_times(gdocs_line[11])
         
-        sober_day = self.resolve_driver_choices(gdocs_line[17])
-        sober_sleeping_night = self.resolve_driver_choices(gdocs_line[18])
-        sober_wake_night = self.resolve_driver_choices(gdocs_line[19])
+        sober_day = self.resolve_shift_sobriety_choices(gdocs_line[17])
+        sober_sleeping_night = self.resolve_shift_sobriety_choices(gdocs_line[18])
+        sober_wake_night = self.resolve_shift_sobriety_choices(gdocs_line[19])
         
-        late_night = self.resolve_shift_type_choices(gdocs_line[20])
-        kitchen = self.resolve_shift_type_choices(gdocs_line[21])
-        bar = self.resolve_shift_type_choices(gdocs_line[22])
-        high_tempo = self.resolve_shift_type_choices(gdocs_line[23])
+        self.late_night_penalty = self.resolve_shift_type_choices(gdocs_line[20])
+        self.kitchen_penalty = self.resolve_shift_type_choices(gdocs_line[21])
+        self.bar_penalty = self.resolve_shift_type_choices(gdocs_line[22])
+        self.high_tempo_penalty = self.resolve_shift_type_choices(gdocs_line[23])
 
-        # print(self)
-
+        # TODO: Normalize the penalties! Very important.
+        
     def __repr__(self):
         return "<Volunteer: %s>" % self.name

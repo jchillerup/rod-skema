@@ -104,10 +104,9 @@ solver.Solve(db)
 
 # solutions print
 count = 0
+cur_high_penalty = -10000000
 while solver.NextSolution():
     count += 1
-
-    print("Solution", count, '\n')
 
     # TODO: Grade the solution
     # TODO: Local Neighbor Search?
@@ -121,6 +120,8 @@ while solver.NextSolution():
         # print ("%s: %s" % (slot, volunteers[slot.Value()].name))
         penalty += volunteers[slot.Value()].consider_shift(slot.shift)
 
-    print("Penalty: %f" % penalty)
+    if penalty > cur_high_penalty:
+        print("Solution %d, penalty: %f" % (count, penalty))
+        cur_high_penalty = penalty
 
 print("Number of solutions:", count)

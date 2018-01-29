@@ -6,3 +6,4 @@ nurse_rostering.py
 v/
 ignore/
 __pycache__/
+out/
