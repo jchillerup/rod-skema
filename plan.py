@@ -104,7 +104,10 @@ solver.Solve(db)
 
 # solutions print
 count = 0
-cur_high_penalty = -10000000
+cur_high_score = -10000000
+
+print(dir(db))
+
 while solver.NextSolution():
     count += 1
 
@@ -114,14 +117,14 @@ while solver.NextSolution():
     # TODO: Make a viz
     #visualize(slots)
 
-    penalty = 0
+    score = 0
     
     for slot in slots:
         # print ("%s: %s" % (slot, volunteers[slot.Value()].name))
-        penalty += volunteers[slot.Value()].consider_shift(slot.shift)
+        score += volunteers[slot.Value()].consider_shift(slot.shift)
 
-    if penalty > cur_high_penalty:
-        print("Solution %d, penalty: %f" % (count, penalty))
-        cur_high_penalty = penalty
+    if score > cur_high_score:
+        print("Solution %d, score: %f" % (count, score))
+        cur_high_score = score
 
 print("Number of solutions:", count)
