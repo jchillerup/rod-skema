@@ -4,4 +4,5 @@
 *.txt
 nurse_rostering.py
 v/
+ignore/
 __pycache__/
