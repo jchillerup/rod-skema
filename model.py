@@ -1,4 +1,4 @@
-import datetime
+import datetime, json
 from util import parse_datetime, check_range_collision
 
 # Use for debugging
@@ -56,6 +56,25 @@ class Shift:
         day = WEEKDAYS[self.starts.weekday()]
         
         return "<%s: %s from %s to %s (%s people)>" % (day, self.type, self.starts, self.ends, self.num_people)
+
+    def to_dict(self):
+        s = []
+        for slot in self.slots:
+            s.append(slot.Value())
+        
+        return {
+            "type": self.type,
+            "starts": self.starts.ctime(),
+            "ends": self.ends.ctime(),
+            "slots": s
+        }
+
+    def shifts_to_json(shifts):
+        s = []
+        for shift in shifts:
+            s.append(shift.to_dict())
+
+        return json.dumps(s)
 
 
 class Volunteer:
@@ -154,6 +173,10 @@ class Volunteer:
 
     def __init__(self, gdocs_line):
         self.name = gdocs_line[1]
+        self.phone_number = gdocs_line[2];
+        self.email = gdocs_line[3];
+        self.ice_number = gdocs_line[4];
+        
         driver = self.resolve_driver(gdocs_line[8])
         has_car = self.resolve_has_car(gdocs_line[9])
 
@@ -172,3 +195,21 @@ class Volunteer:
         
     def __repr__(self):
         return "<Volunteer: %s>" % self.name
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "email": self.email,
+            "phone_number": self.phone_number,
+            "ice_number": self.ice_number,
+            "can_drive": self.can_drive,
+            "has_car": self.has_car            
+        }
+
+    
+    def volunteers_to_json(volunteers):
+        v = []
+        for volunteer in volunteers:
+            v.append(volunteer.to_dict())
+            
+        return json.dumps(v)

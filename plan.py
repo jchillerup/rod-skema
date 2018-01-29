@@ -1,3 +1,4 @@
+from model import Shift, Volunteer
 from loader import get_shifts_from_csv, get_volunteers_from_csv
 from ortools.constraint_solver import pywrapcp
 
@@ -18,6 +19,7 @@ shifts = get_shifts_from_csv()
 slots = []
 
 # TODO: Consider a 2D model of boolean values instead
+
 
 # Make a slot for each person needed for a shift
 for shift in shifts:
@@ -126,5 +128,14 @@ while solver.NextSolution():
     if score > cur_high_score:
         print("Solution %d, score: %f" % (count, score))
         cur_high_score = score
+
+        fp = open('out/%d-%d-volunteers.json' % (count, score), 'w')
+        fp.write(Volunteer.volunteers_to_json(volunteers))
+        fp.close()
+
+        
+        fp = open('out/%d-%d-shifts.json' % (count, score), 'w')
+        fp.write(Shift.shifts_to_json(shifts))
+        fp.close()
 
 print("Number of solutions:", count)
