@@ -131,6 +131,11 @@ class Volunteer:
         if i == "Det vil jeg meget gerne undgå": return 0
         return -1
 
+    def consider_shift(self, shift):
+
+        # TODO: Working with friends?
+        return -1
+
 
     def __init__(self, gdocs_line):
         self.name = gdocs_line[1]

@@ -1,6 +1,8 @@
 from loader import get_shifts_from_csv, get_volunteers_from_csv
 from ortools.constraint_solver import pywrapcp
 
+
+MINIMUM_SHIFT_LENGTH_TO_TRIGGER_COOLDOWN = 0
 COOL_DOWN_HOURS = 8
 
 # hver vagt er en IntVar, og dens værdi er hvilken frivillig der tager den
@@ -24,7 +26,12 @@ for shift in shifts:
         # TODO: Consider using a sparse variable instead of defining the availability
         # in terms of constraints:
         #   x = solver.IntVar([1, 3, 5], 'x')
-        local_slots.append(solver.IntVar(0, len(volunteers)-1, str(shift)))
+
+        slot = solver.IntVar(0, len(volunteers)-1, str(shift))
+
+        # Tag on the a reference to the shift so we can use it for soft constraints
+        slot.shift = shift
+        local_slots.append(slot)
 
     # make sure that we're not assigning the same people to two slots on the same shift
     solver.Add(solver.AllDifferent(local_slots))
@@ -33,8 +40,7 @@ for shift in shifts:
     # In a minute we'll need to access the slots of this shift, so let's put
     # them somewhere where we can find them.
     shift.slots = local_slots
-
-
+    
 # Make sure we're not assigning the same people to overlapping shifts (one cannot work
 # both in the bar and the kitchen at the same time)
 for shift in shifts:
@@ -65,10 +71,10 @@ for volunteer_idx, volunteer in enumerate(volunteers):
 # Give volunteers a "cool down period" after a shift
 for shift in shifts:
     # debug: look at the number of constraints on each shift
-    print("%s: %d" % (shift, shift.number_of_constraints))
+    # print("%s: %d" % (shift, shift.number_of_constraints))
     
     # We could have a minimum shift duration in order to trigger the cooldown
-    if shift.duration_hours() > 0:
+    if shift.duration_hours() > MINIMUM_SHIFT_LENGTH_TO_TRIGGER_COOLDOWN:
         for too_close_candidate in shifts:
             if shift == too_close_candidate: continue
             d = too_close_candidate.starts - shift.ends
@@ -89,8 +95,11 @@ for shift in shifts:
                 solver.Add(solver.AllDifferent(local_slots))
 
 
+
+
+                
 # decision builder
-db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
+db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE)
 solver.Solve(db)
 
 # solutions print
@@ -103,13 +112,15 @@ while solver.NextSolution():
     # TODO: Grade the solution
     # TODO: Local Neighbor Search?
 
-    # Make a viz
+    # TODO: Make a viz
+    #visualize(slots)
+
+    penalty = 0
     
     for slot in slots:
-        print ("%s: %s" % (slot, volunteers[slot.Value()].name))
-    break;
+        # print ("%s: %s" % (slot, volunteers[slot.Value()].name))
+        penalty += volunteers[slot.Value()].consider_shift(slot.shift)
+
+    print("Penalty: %f" % penalty)
 
 print("Number of solutions:", count)
-
-
-# TODO write a visualizer
