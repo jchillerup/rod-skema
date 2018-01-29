@@ -15,10 +15,15 @@ print ("Number of volunteers: %d" % len(volunteers))
 shifts = get_shifts_from_csv()
 slots = []
 
+# TODO: Consider a 2D model of boolean values instead
+
 # Make a slot for each person needed for a shift
 for shift in shifts:
     local_slots = []
     for i in range(shift.num_people):
+        # TODO: Consider using a sparse variable instead of defining the availability
+        # in terms of constraints:
+        #   x = solver.IntVar([1, 3, 5], 'x')
         local_slots.append(solver.IntVar(0, len(volunteers)-1, str(shift)))
 
     # make sure that we're not assigning the same people to two slots on the same shift
@@ -47,10 +52,21 @@ for shift in shifts:
 
 
 # Make sure we don't assign shifts to days when a volunteer is not present
-#TODO
+for volunteer_idx, volunteer in enumerate(volunteers):
+    for shift in shifts:
+        if not volunteer.can_take(shift):
+            shift.number_of_constraints += 1
+            #print("Volunteer %s can't take shift %s" % (volunteer, shift)
+
+            for slot in shift.slots:
+                solver.Add(slot != volunteer_idx)
+
 
 # Give volunteers a "cool down period" after a shift
 for shift in shifts:
+    # debug: look at the number of constraints on each shift
+    print("%s: %d" % (shift, shift.number_of_constraints))
+    
     # We could have a minimum shift duration in order to trigger the cooldown
     if shift.duration_hours() > 0:
         for too_close_candidate in shifts:
@@ -85,12 +101,13 @@ while solver.NextSolution():
     print("Solution", count, '\n')
 
     # TODO: Grade the solution
+    # TODO: Local Neighbor Search?
 
     # Make a viz
     
     for slot in slots:
         print ("%s: %s" % (slot, volunteers[slot.Value()].name))
-    #break;
+    break;
 
 print("Number of solutions:", count)
 

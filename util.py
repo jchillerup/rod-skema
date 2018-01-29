@@ -9,3 +9,7 @@ def parse_datetime(i):
     d = datetime.strptime(new_date_string, '%Y %a %d/%m %H:%M')
     
     return d
+
+def check_range_collision(a_start, a_end, b_start, b_end):
+    # https://stackoverflow.com/questions/325933/determine-whether-two-date-ranges-overlap
+    return max(a_start, b_start) < min(a_end, b_end)

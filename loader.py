@@ -1,6 +1,6 @@
 import csv
 from datetime import datetime
-from model import Volunteer, ShiftSlot
+from model import Volunteer, Shift
 
 
 def csv_streamer(filename):
@@ -19,7 +19,7 @@ def get_shifts_from_csv():
     shifts = []
     
     for line in csv_streamer('tjanser.csv'):
-        shifts.append(ShiftSlot(line))
+        shifts.append(Shift(line))
 
     return shifts
 
