@@ -27,6 +27,8 @@ def get_volunteers_from_csv():
     volunteers = []
 
     for line in csv_streamer('frivillige.csv'):
-        volunteers.append(Volunteer(line))
+        v = Volunteer()
+        v.from_csv(line)
+        volunteers.append(v)
 
     return volunteers

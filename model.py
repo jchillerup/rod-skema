@@ -1,5 +1,8 @@
 import datetime, json
 from util import parse_datetime, check_range_collision
+from peewee import *
+
+db = SqliteDatabase('rod.db')
 
 # Use for debugging
 HALF_LOAD = True
@@ -19,7 +22,6 @@ ROD_DAYS = [
 ]
 
 class Shift:
-    # bar, kitchen, janitor
     type = None
     num_people = 0
     starts = None
@@ -77,13 +79,29 @@ class Shift:
         return json.dumps(s)
 
 
-class Volunteer:
-    name = None
-    can_drive = False
-    has_car = False
-    phone_number = None
-    available_starts = None
-    available_ends = None
+class Volunteer(Model):
+    name = CharField(unique=True)
+    phone_number = CharField()
+    ice_number = CharField()
+    email = CharField()
+    can_drive = BooleanField()
+    has_car = BooleanField()
+    available_start = DateTimeField()
+    available_end = DateTimeField()
+
+    sober_day_shift_penalty = FloatField()
+    sober_sleep_night_penalty = FloatField()
+    sober_wake_night_penalty = FloatField()
+
+    wants_to_work_with_string = CharField()
+    comments = TextField()
+
+    load_multiplier = FloatField()
+    has_had_friends_added = BooleanField()
+
+    class Meta:
+        database = db
+    
     
     def can_take(self, shift):
         return check_range_collision(self.available_start, self.available_end, shift.starts, shift.ends)
@@ -171,26 +189,30 @@ class Volunteer:
         return penalty
 
 
-    def __init__(self, gdocs_line):
+    def from_csv(self, gdocs_line):
         self.name = gdocs_line[1]
         self.phone_number = gdocs_line[2];
         self.email = gdocs_line[3];
         self.ice_number = gdocs_line[4];
-        
-        driver = self.resolve_driver(gdocs_line[8])
-        has_car = self.resolve_has_car(gdocs_line[9])
+        self.can_drive = self.resolve_driver(gdocs_line[8])
+        self.has_car = self.resolve_has_car(gdocs_line[9])
 
         self.resolve_times(gdocs_line[11])
         
-        sober_day = self.resolve_shift_sobriety_choices(gdocs_line[17])
-        sober_sleeping_night = self.resolve_shift_sobriety_choices(gdocs_line[18])
-        sober_wake_night = self.resolve_shift_sobriety_choices(gdocs_line[19])
+        self.sober_day_shift_penalty = self.resolve_shift_sobriety_choices(gdocs_line[17])
+        self.sober_sleep_night_penalty = self.resolve_shift_sobriety_choices(gdocs_line[18])
+        self.sober_wake_night_penalty = self.resolve_shift_sobriety_choices(gdocs_line[19])
         
         self.late_night_penalty = self.resolve_shift_type_choices(gdocs_line[20])
         self.kitchen_penalty = self.resolve_shift_type_choices(gdocs_line[21])
         self.bar_penalty = self.resolve_shift_type_choices(gdocs_line[22])
         self.high_tempo_penalty = self.resolve_shift_type_choices(gdocs_line[23])
+        self.wants_to_work_with_string = gdocs_line[24]
+        self.comments = gdocs_line[25]
 
+        self.load_multiplier = 1.0
+        self.has_had_friends_added = False
+        
         # TODO: Normalize the penalties! Very important.
         
     def __repr__(self):
@@ -215,3 +237,14 @@ class Volunteer:
             v.append(volunteer.to_dict())
             
         return json.dumps(v)
+
+
+class VolunteerRelation(Model):
+    volunteer = ForeignKeyField(Volunteer)
+    likes = ForeignKeyField(Volunteer)
+
+    class Meta:
+        database = db
+
+if __name__ == '__main__':
+    db.create_tables([Volunteer, VolunteerRelation]);
