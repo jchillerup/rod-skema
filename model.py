@@ -203,7 +203,9 @@ class Volunteer:
             "phone_number": self.phone_number,
             "ice_number": self.ice_number,
             "can_drive": self.can_drive,
-            "has_car": self.has_car            
+            "has_car": self.has_car,
+            "arrives": self.available_start.ctime(),
+            "departs": self.available_end.ctime(),
         }
 
     
