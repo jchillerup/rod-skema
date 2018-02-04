@@ -10,8 +10,10 @@ COOL_DOWN_HOURS = 8
 solver = pywrapcp.Solver('rod')
 
 
-volunteers = get_volunteers_from_csv()
+#volunteers = get_volunteers_from_csv()
 #volunteers.extend(volunteers[:16])
+
+volunteers = Volunteer.select()
 
 print ("Number of volunteers: %d" % len(volunteers))
 

@@ -89,6 +89,11 @@ class Volunteer(Model):
     available_start = DateTimeField()
     available_end = DateTimeField()
 
+    late_night_penalty = FloatField()
+    kitchen_penalty = FloatField()
+    bar_penalty = FloatField()
+    high_tempo_penalty = FloatField()
+    
     sober_day_shift_penalty = FloatField()
     sober_sleep_night_penalty = FloatField()
     sober_wake_night_penalty = FloatField()
