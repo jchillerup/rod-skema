@@ -5,7 +5,7 @@ from peewee import *
 db = SqliteDatabase('rod.db')
 
 # Use for debugging
-HALF_LOAD = True
+HALF_LOAD = False
 
 WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"]
 
@@ -39,6 +39,16 @@ class Shift:
     def duration_hours(self):
         d = self.ends - self.starts
         return d.seconds / 60 / 60
+
+    def get_load(self):
+        d = self.duration_hours()
+
+        # TODO: Make this a bit smarter...
+        
+        if d > 12:
+            return d / 3
+        else:
+            return d
     
     def __init__(self, gdocs_line):
         self.type = gdocs_line[0]
@@ -121,6 +131,9 @@ class Volunteer(Model):
 
         return 0
 
+    def hours_active(self):
+        return ((self.available_end-self.available_start).total_seconds()/60/60)
+    
     def resolve_times(self, i):
         times = i.split(";")
         out = []

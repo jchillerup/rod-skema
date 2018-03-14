@@ -28,7 +28,11 @@ def get_volunteers_from_csv():
 
     for line in csv_streamer('frivillige.csv'):
         v = Volunteer()
-        v.from_csv(line)
-        volunteers.append(v)
+        try:
+            v.from_csv(line)
+            volunteers.append(v)
+        except ValueError:
+            print("Warning: couldn't add %s" % v)
+            
 
     return volunteers

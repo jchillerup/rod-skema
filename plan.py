@@ -1,10 +1,10 @@
 from model import Shift, Volunteer
 from loader import get_shifts_from_csv, get_volunteers_from_csv
 from ortools.constraint_solver import pywrapcp
-
+import statistics, math
 
 MINIMUM_SHIFT_LENGTH_TO_TRIGGER_COOLDOWN = 0
-COOL_DOWN_HOURS = 8
+COOL_DOWN_HOURS = 6
 
 # hver vagt er en IntVar, og dens værdi er hvilken frivillig der tager den
 solver = pywrapcp.Solver('rod')
@@ -19,6 +19,7 @@ print ("Number of volunteers: %d" % len(volunteers))
 
 shifts = get_shifts_from_csv()
 slots = []
+loads = []
 
 # TODO: Consider a 2D model of boolean values instead
 
@@ -37,6 +38,10 @@ for shift in shifts:
         slot.shift = shift
         local_slots.append(slot)
 
+        # Put the shift load into a structure so we can calculate a fair schedule for
+        # everyone
+        loads.append(shift.get_load())
+
     # make sure that we're not assigning the same people to two slots on the same shift
     solver.Add(solver.AllDifferent(local_slots))
     slots.extend(local_slots)
@@ -54,6 +59,8 @@ for shift in shifts:
             
             # We have two shifts that collide. We need different volunteers for *all*
             # the slots in those periods
+
+            # TODO: Use NullIntersect instead?
             local_slots = []
             local_slots.extend(shift.slots)
             local_slots.extend(collision_candidate.slots)
@@ -103,14 +110,29 @@ for shift in shifts:
 
                 
 # decision builder
-db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE)
+db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
 solver.Solve(db)
+
+
+# Solution collector
+solution = solver.Assignment()
+solution.Add(slots)
+collector = solver.AllSolutionCollector(solution)
+
 
 # solutions print
 count = 0
 cur_high_score = -10000000
+cur_lowest_stdev = 10000000
 
-print(dir(db))
+print("Solutions found:", collector.SolutionCount())
+
+
+def norm(l):
+    s = 0
+    for i in l:
+        s += i**2
+    return math.sqrt(s)
 
 while solver.NextSolution():
     count += 1
@@ -118,26 +140,30 @@ while solver.NextSolution():
     # TODO: Grade the solution
     # TODO: Local Neighbor Search?
 
-    # TODO: Make a viz
-    #visualize(slots)
-
     score = 0
+
+    hours_worked = [0] * len(volunteers)
     
     for slot in slots:
-        # print ("%s: %s" % (slot, volunteers[slot.Value()].name))
-        score += volunteers[slot.Value()].consider_shift(slot.shift)
+        
+        # score += volunteers[slot.Value()].consider_shift(slot.shift)
+        hours_worked[slot.Value()] += ( slot.shift.get_load() / volunteers[slot.Value()].load_multiplier ) / volunteers[slot.Value()].hours_active()
 
-    if score > cur_high_score:
-        print("Solution %d, score: %f" % (count, score))
-        cur_high_score = score
+    if (not norm(hours_worked) < cur_lowest_stdev): continue
+    cur_lowest_stdev = norm(hours_worked)
+    print("%s: %s" % (cur_lowest_stdev, hours_worked))
+    
+    #if score > cur_high_score:
+    #    print("Solution %d, score: %f" % (count, score))
+    #    cur_high_score = score
 
-        fp = open('out/%d-%d-volunteers.json' % (count, score), 'w')
-        fp.write(Volunteer.volunteers_to_json(volunteers))
-        fp.close()
+    #    fp = open('out/%d-%d-volunteers.json' % (count, score), 'w')
+    #    fp.write(Volunteer.volunteers_to_json(volunteers))
+    #    fp.close()
 
         
-        fp = open('out/%d-%d-shifts.json' % (count, score), 'w')
-        fp.write(Shift.shifts_to_json(shifts))
-        fp.close()
+    #    fp = open('out/%d-%d-shifts.json' % (count, score), 'w')
+    #    fp.write(Shift.shifts_to_json(shifts))
+    #    fp.close()
 
 print("Number of solutions:", count)
