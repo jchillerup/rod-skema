@@ -2,56 +2,109 @@ import datetime, json
 from util import parse_datetime, check_range_collision
 from peewee import *
 
-db = SqliteDatabase('rod.db')
+db = SqliteDatabase('rod2019.db')
 
 # Use for debugging
 HALF_LOAD = False
 
 WEEKDAYS = ["Søndag", "Mandag", "Tirsdag", "Onsdag", "Torsdag", "Fredag", "Lørdag"]
+MONTHS = ["", "januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"]
 
 ROD_DAYS = [
-    datetime.date(2018, 3, 23),
-    datetime.date(2018, 3, 24),
-    datetime.date(2018, 3, 25),
-    datetime.date(2018, 3, 26),
-    datetime.date(2018, 3, 27),
-    datetime.date(2018, 3, 28),
-    datetime.date(2018, 3, 29),
-    datetime.date(2018, 3, 30),
-    datetime.date(2018, 3, 31),
+    datetime.date(2019, 4, 12),
+    datetime.date(2019, 4, 13),
+    datetime.date(2019, 4, 14),
+    datetime.date(2019, 4, 15),
+    datetime.date(2019, 4, 16),
+    datetime.date(2019, 4, 17),
+    datetime.date(2019, 4, 18),
+    datetime.date(2019, 4, 19),
+    datetime.date(2019, 4, 20),
 ]
 
-class Shift:
-    type = None
-    num_people = 0
-    starts = None
-    ends = None
-    needs_driver = False
-    is_kitchen = False
-    is_bar = False
-    is_high_tempo = False
+STARTING_DAYS = {
+    "fredag": datetime.date(2019, 4, 12),
+    "lørdag": datetime.date(2019, 4, 13),
+    "søndag": datetime.date(2019, 4, 14),
+    "mandag": datetime.date(2019, 4, 15),
+    "tirsdag": datetime.date(2019, 4, 16),
+    "onsdag": datetime.date(2019, 4, 17),
+    "torsdag": datetime.date(2019, 4, 18),
+}
+
+ENDING_DAYS = {
+    "søndag": datetime.date(2019, 4, 14),
+    "mandag": datetime.date(2019, 4, 15),
+    "tirsdag": datetime.date(2019, 4, 16),
+    "onsdag": datetime.date(2019, 4, 17),
+    "torsdag": datetime.date(2019, 4, 18),
+    "fredag": datetime.date(2019, 4, 19),
+    "lørdag": datetime.date(2019, 4, 20),
+}
+
+class Shift(Model):
+    title = CharField()
+    num_people = IntegerField()
+    starts = DateTimeField()
+    ends = DateTimeField()
+    needs_driver = BooleanField()
+    is_kitchen = BooleanField()
+    is_bar = BooleanField()
+    is_high_tempo = BooleanField()
     
     number_of_constraints = 0
+    
+    class Meta:
+        database = db
 
+    def find_candidates(self):
+        cand = []
+        for v in Volunteer.select():
+            if v.could_take(self):
+                cand.append(v)
+        return cand
+        
+    def get(sid):
+        return Shift.select().where(Shift.id == sid)[0]
+        
+    def get_volunteers(self):
+        return Volunteer.select().join(VolunteerShiftRelation).where(VolunteerShiftRelation.shift == self)        
+    
     def collides_with(self, candidate):
         return check_range_collision(self.starts, self.ends, candidate.starts, candidate.ends)
 
+    def soft_collides_with(self, candidate):
+        if self.collides_with(candidate):
+            return True
+
+        time_to_next = (candidate.starts - self.ends).total_seconds()
+        time_from_prev = (self.starts - candidate.ends).total_seconds()
+        
+        if time_to_next >= 0 and time_to_next < 8*60*60:
+            return True
+
+        if time_from_prev >= 0 and time_from_prev < 8*60*60:
+            return True
+
+        return False
+    
     def duration_hours(self):
         d = self.ends - self.starts
-        return d.seconds / 60 / 60
+        return d.total_seconds() / 60 / 60
 
+    def get_day(self):
+        return WEEKDAYS[(self.starts.weekday() + 1) % 7] 
+    
     def get_load(self):
         d = self.duration_hours()
-
         # TODO: Make this a bit smarter...
-        
         if d > 12:
-            return d / 3
+            return d / 2
         else:
             return d
     
-    def __init__(self, gdocs_line):
-        self.type = gdocs_line[0]
+    def from_csv(self, gdocs_line):
+        self.title = gdocs_line[0]
         self.num_people = int(gdocs_line[1])
         self.starts = parse_datetime(gdocs_line[2])
         self.ends = parse_datetime(gdocs_line[3])
@@ -60,27 +113,48 @@ class Shift:
         self.is_kitchen = bool(int(gdocs_line[5]))
         self.is_bar = bool(int(gdocs_line[6]))
         self.is_high_tempo = bool(int(gdocs_line[7]))
+        self.needs_driver = False
 
         if HALF_LOAD:
             self.num_people = self.num_people // 2
     
     def __repr__(self):
-        day = WEEKDAYS[self.starts.weekday()]
+        day = WEEKDAYS[(self.starts.weekday()+1)%7]
         
-        return "<%s: %s from %s to %s (%s people)>" % (day, self.type, self.starts, self.ends, self.num_people)
+        return "<%s %s-%s: %s (%s/%s people) [%d]>" % (day, self.starts.strftime("%H:%M"), self.ends.strftime("%H:%M"), self.title, len(self.get_volunteers()), self.num_people, self.id)
 
     def to_dict(self):
         s = []
         for slot in self.slots:
-            s.append(slot.Value())
+            try:
+                s.append(slot.Value())
+            except:
+                s.append(slot)
         
         return {
-            "type": self.type,
+            "id": self.id,
+            "title": self.title,
             "starts": self.starts.ctime(),
             "ends": self.ends.ctime(),
             "slots": s
         }
 
+    def assign_volunteer(self, volunteer):
+        if type(volunteer) == str:
+            volunteer = Volunteer.query(volunteer)
+
+        if (self not in volunteer.get_shifts()):
+            vsr = VolunteerShiftRelation(shift=self, volunteer=volunteer)
+            vsr.save()
+
+    def remove_volunteer(self, volunteer):
+        if type(volunteer) == str:
+            volunteer = Volunteer.query(volunteer)
+        
+        vsr = VolunteerShiftRelation.delete().where(VolunteerShiftRelation.shift == self).where(VolunteerShiftRelation.volunteer == volunteer)
+        return vsr.execute()
+        
+    
     def shifts_to_json(shifts):
         s = []
         for shift in shifts:
@@ -91,168 +165,104 @@ class Shift:
 
 class Volunteer(Model):
     name = CharField(unique=True)
-    phone_number = CharField()
-    ice_number = CharField()
-    email = CharField()
-    can_drive = BooleanField()
-    has_car = BooleanField()
+    phone_number = CharField(null=True)
+    ice_number = CharField(null=True)
+    email = CharField(null=True)
+    can_drive = BooleanField(null=True)
+    has_car = BooleanField(null=True)
     available_start = DateTimeField()
     available_end = DateTimeField()
-
-    late_night_penalty = FloatField()
-    kitchen_penalty = FloatField()
-    bar_penalty = FloatField()
-    high_tempo_penalty = FloatField()
     
-    sober_day_shift_penalty = FloatField()
-    sober_sleep_night_penalty = FloatField()
-    sober_wake_night_penalty = FloatField()
-
-    wants_to_work_with_string = CharField()
-    comments = TextField()
+    comments = TextField(null=True)
 
     load_multiplier = FloatField()
-    has_had_friends_added = BooleanField()
+    has_had_friends_added = BooleanField(null=True)
 
     class Meta:
         database = db
-    
-    
-    def can_take(self, shift):
-        return check_range_collision(self.available_start, self.available_end, shift.starts, shift.ends)
-    
-    def resolve_driver(self, i):
-        if i == "Ja": return 1
-        if i == "Nej": return 0
-        if i == "Jeg har kørekort men er helst fri for at køre": return 0.5
 
-    def resolve_has_car(self, i):
-        if i.lower() == "ja": return 1
+    def get(i):
+        return Volunteer.select().where(Volunteer.id==i)[0]
+        
+    def query(name):
+        return Volunteer.select().where(Volunteer.name.startswith(name))[0]
 
-        return 0
+    def set_arrival(self, day, time):
+        timestamp = datetime.datetime.combine(STARTING_DAYS[day], datetime.datetime.strptime(time, "%H:%M").time())
 
-    def hours_active(self):
+        print("Setting arrival for %s to %s" % (self.name, timestamp))
+        
+        self.available_start = timestamp
+        self.save()
+
+    def set_departure(self, day, time):
+        timestamp = datetime.datetime.combine(ENDING_DAYS[day], datetime.datetime.strptime(time, "%H:%M").time())
+        print("Setting departure for %s to %s" % (self.name, timestamp))
+        
+        self.available_end = timestamp
+        self.save()
+        
+    def get_first_name(self):
+        return self.name.split(" ")[0]
+        
+    def get_friends(self):
+        return Volunteer.select().join(VolunteerRelation, on=VolunteerRelation.likes).where(VolunteerRelation.volunteer == self)
+
+    def get_shifts(self):
+        return Shift.select().join(VolunteerShiftRelation).where(VolunteerShiftRelation.volunteer == self).order_by(Shift.starts)
+    
+    def get_num_bar_shifts(self):
+        ret = 0
+        for s in self.get_shifts():
+            if s.is_bar:
+                ret += 1
+        return ret
+
+    def hours_present(self):
         return ((self.available_end-self.available_start).total_seconds()/60/60)
     
-    def resolve_times(self, i):
-        times = i.split(";")
-        out = []
+    def hours_active(self):
+        return self.hours_present() * self.load_multiplier
+    
+    def get_load(self):
+        hours_available = self.hours_active()
+        total_shift_time = sum([s.get_load() for s in self.get_shifts()])
 
-        strings = [
-            "Opsætningsvagt fredag d. 23/3 til lørdag d. 24/3: Til opsætning/forberedelse af stævnet fra kl. 15 fredag til 15 lørdag dag (Selvfølgelig med søvn og pauser indregnet!)", 
-            "Lørdag d. 24/3",
-            "Søndag d. 25/3",
-            "Mandag d. 26/3",
-            "Tirsdag d. 27/3",
-            "Onsdag d. 28/3",
-            "Torsdag d. 29/3",
-            "Fredag d. 30/3",
-            "Nedtagningsvagt fredag d. 30/3 til lørdag d. 31/3: Nedtagning af ROD fra fredag eftermiddag til lørdag ved middagstid. (Der er mulighed for at aftale afgangstidspunkt lørdag med arbejdsgruppen).",
-        ]
+        return (total_shift_time/hours_available)
+    
+    def takes_shift(self, shift):
+        vsr = VolunteerShiftRelation.select().where(VolunteerShiftRelation.volunteer == self and VolunteerShiftRelation.shift == shift)
 
-        for j in range(len(strings)):
-            if strings[j] in times: out.append(j)
+        return len(vsr) > 0
+    
+    def can_take(self, shift):
+        # return shift.starts >= self.available_start and shift.ends <= self.available_end
+        return check_range_collision(self.available_start, self.available_end, shift.starts, shift.ends) and shift.ends <= self.available_end and shift.starts >= self.available_start
+        #return (self.available_start <= shift.starts) and (self.available_end >= shift.ends)
 
-        # Shouldn't really be necessary...
-        out.sort()
+    def could_take(self, shift):
+        if not self.can_take(shift):
+            return False
 
-        # Special case: the block contains consecutive days:
-        #print("Max: %d, Min: %d, Len: %d" % (max(out), min(out), len(out)))
-        if (max(out)-min(out)+1 == len(out)):
-            # TODO: Support arrival and departure times
-            
-            self.available_start = datetime.datetime.combine(ROD_DAYS[min(out)],
-                                                             datetime.time(12,00)
-            )
-            self.available_end = datetime.datetime.combine(ROD_DAYS[max(out)],
-                                                           datetime.time(18,00))
-
-            self.available = self.available_end - self.available_start
-            
-        else:
-            raise ValueError('Volunteer %s has non-consecutive dates' % self)
+        if shift in self.get_shifts():
+            return False
         
-        # print("Given: %s\nStart: %s, end: %s" % (i, self.available_start, self.available_end))
+        for coll_candidate in self.get_shifts():
+            if shift.collides_with(coll_candidate):
+                return False
+
+            if shift.soft_collides_with(coll_candidate):
+                return False
         
-        return out
-
-    # 17,18,19
-    def resolve_shift_sobriety_choices(self, i):
-        if i == "Det er tiptop": return 1
-        if i == "Det har jeg det okay med": return 0
-        if i == "Det vil jeg helst undgå": return -1
-        if i == "Det har jeg det skidt med": return -3
-        if i == "Jeg har ikke kørekort": return -10
-
-        return -1
-
-    # 20,21,22,23
-    def resolve_shift_type_choices(self, i):
-        if i == "Det synes jeg er mega fedt!": return 1
-        if i == "Det har jeg det fint med": return 0
-        if i == "Det vil jeg helst ikke": return -1
-        if i == "Det vil jeg meget gerne undgå": return -5
-        return -1
-
-    def consider_shift(self, shift):
-        penalty = 0
-
-        #penalty += shift.is_late_night * self.late_night_penalty
-        penalty += shift.is_kitchen * self.kitchen_penalty
-        penalty += shift.is_bar * self.bar_penalty
-        penalty += shift.is_high_tempo * self.high_tempo_penalty
-        
-        # TODO: Driving constraints?
-        # TODO: Working with friends?
-        return penalty
-
-
-    def from_csv(self, gdocs_line):
-        self.name = gdocs_line[1]
-        self.phone_number = gdocs_line[2];
-        self.email = gdocs_line[3];
-        self.ice_number = gdocs_line[4];
-        self.can_drive = self.resolve_driver(gdocs_line[8])
-        self.has_car = self.resolve_has_car(gdocs_line[9])
-
-        self.resolve_times(gdocs_line[11])
-        
-        self.sober_day_shift_penalty = self.resolve_shift_sobriety_choices(gdocs_line[17])
-        self.sober_sleep_night_penalty = self.resolve_shift_sobriety_choices(gdocs_line[18])
-        self.sober_wake_night_penalty = self.resolve_shift_sobriety_choices(gdocs_line[19])
-        
-        self.late_night_penalty = self.resolve_shift_type_choices(gdocs_line[20])
-        self.kitchen_penalty = self.resolve_shift_type_choices(gdocs_line[21])
-        self.bar_penalty = self.resolve_shift_type_choices(gdocs_line[22])
-        self.high_tempo_penalty = self.resolve_shift_type_choices(gdocs_line[23])
-        self.wants_to_work_with_string = gdocs_line[24]
-        self.comments = gdocs_line[25]
-
-        self.load_multiplier = 1.0
-        self.has_had_friends_added = False
-        
-        # TODO: Normalize the penalties! Very important.
+        return True
         
     def __repr__(self):
-        return "<Volunteer: %s>" % self.name
+        return "<Volunteer: %s [%d]>" % (self.name, self.id)
 
-    def to_dict(self):
-        return {
-            "name": self.name,
-            "email": self.email,
-            "phone_number": self.phone_number,
-            "ice_number": self.ice_number,
-            "can_drive": self.can_drive,
-            "has_car": self.has_car,
-            "arrives": self.available_start.ctime(),
-            "departs": self.available_end.ctime(),
-        }
-
-    
     def volunteers_to_json(volunteers):
-        v = []
+        v = dict()
         for volunteer in volunteers:
-            v.append(volunteer.to_dict())
+            v[volunteer.id] = volunteer.to_dict()
             
         return json.dumps(v)
 
@@ -264,5 +274,14 @@ class VolunteerRelation(Model):
     class Meta:
         database = db
 
+class VolunteerShiftRelation(Model):
+    volunteer = ForeignKeyField(Volunteer)
+    shift = ForeignKeyField(Shift)
+    has_had_reminder = BooleanField(default=False, null=False)
+
+    class Meta:
+        database = db
+        
 if __name__ == '__main__':
-    db.create_tables([Volunteer, VolunteerRelation]);
+    # Volunteer, VolunteerRelation, Shift, 
+    db.create_tables([Volunteer, Shift, VolunteerShiftRelation]);

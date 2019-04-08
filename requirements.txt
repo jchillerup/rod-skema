@@ -1,3 +1,4 @@
-ortools==6.6.4656
-protobuf==3.5.1
-six==1.11.0
+ortools
+protobuf
+six
+peewee
