@@ -1,0 +1,3 @@
+- Lad available time for en frivillig være afgrænset af selve stævnet. Hvis man er tilstede udenfor skal det tælle mod arbejdede timer. Det giver mere fritid til dem, som medvirker ved opstillingen.
+- Lad "kan-ikke-tage-vagten"-forhold være en del af matricen når den defineres. I stedet for at definere alle felter 0-1, kunne sikre nej'er kodes som 0-0 og sikre ja'er kodes som 1-1.
+- Hvis kan-tage-matricen ikke består tests for belægning, behøver man ikke solve. 

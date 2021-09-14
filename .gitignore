@@ -7,3 +7,4 @@ v/
 ignore/
 __pycache__/
 out/
+secrets.py

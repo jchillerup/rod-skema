@@ -1,0 +1,58 @@
+<html>
+
+  <head>
+    <script>
+      VOLUNTEERS = {
+      {% for volunteer in volunteers %}
+      {{volunteer.id}}: {"id": {{volunteer.id}},
+      "name": "{{volunteer.name}}",
+      "load": {{ volunteer.get_load() }},
+      "friends": [ {{ volunteer.get_friends()|map(attribute="id")|join(", ") }} ]
+      },
+      {% endfor %}
+      }
+    </script>
+
+    <script src="{{url_for('static', filename='jquery.min.js')}}"></script>
+    <script src="{{url_for('static', filename='Sortable.min.js')}}"></script>
+    
+    <style type="text/css">
+      body {
+      background: #ccc;
+      font-family: sans-serif;
+      }
+
+      .shift {
+      float: left;
+      width: calc(20% - 12px);
+      margin: 5px;
+      border: 1px solid #999;
+      background: #fff;
+      min-height: 450px;
+      }
+
+      .shift h2 {
+      margin: 0px;
+      }
+    </style>
+  </head>
+  
+  <body>
+    {% for shift in shifts %}
+
+    <div class="shift shift-{{shift.id}}">
+      <h2>{{shift.title}} [sid: {{shift.id}}]</h2>
+      <p>{{shift.get_day()}}</p>
+      <p>{{ shift.starts }} - {{ shift.ends }}</p>
+      <p>C: {{ shift.get_volunteers()|count }} / {{shift.num_people}}</p>
+
+      <ul>
+	{% for volunteer in shift.get_volunteers() %}
+	<li class="volunteer-{{volunteer.id}}">{{volunteer.name}} ({{'%0.2f'|format(volunteer.get_load())}})</li>
+	{% endfor %}
+      </ul>
+    </div>
+    
+    {% endfor %}
+  </body>
+</html>

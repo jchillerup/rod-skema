@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script src="https://unpkg.com/@fullcalendar/core@4.0.1/main.min.js"></script>
+<script src="https://unpkg.com/@fullcalendar/core@4.0.1/locales/da.js"></script>
+<script src="https://unpkg.com/@fullcalendar/daygrid@4.0.1/main.min.js"></script>
+<script src="https://unpkg.com/@fullcalendar/timegrid@4.0.1/main.min.js"></script>
+<script src="https://unpkg.com/@fullcalendar/bootstrap@4.0.1/main.min.js"></script>
+
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@fullcalendar/core@4.0.1/main.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@4.0.1/main.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@4.0.1/main.min.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@fullcalendar/bootstrap@4.0.1/main.min.css">
+
+<script>
+  $(function() {
+      var calendar = new FullCalendar.Calendar($('#calendar')[0], {
+	  plugins: [ 'timeGrid' ],
+	  locales: ['da'],
+	  locale: 'da',
+	  defaultView: 'timeGridROD',
+	  themeSystem: 'bootstrap4',
+	  minTime: "02:00:00",
+	  maxTime: "1.02:00:00",
+	  slotDuration: "01:00:00",
+	  contentHeight: "auto",
+	  visibleRange: {
+	      start: '2019-04-12',
+	      end: '2019-04-22'
+	  },
+	  defaultDate: '2019-04-12',
+	  header: {
+	      left: '',
+	      center: '',
+	      right: ''
+	  },
+	  nowIndicator:true,
+	  views: {
+              timeGridROD: {
+		  type: 'timeGrid',
+		  allDaySlot: false,
+		  duration: { days: 10 },
+		  buttonText: 'ROD'	  
+              }
+	  },
+	  
+	  weekNumbers: false,
+	  events: {{ shifts_json|safe }}
+      });
+      calendar.render();
+  });
+</script>
+
+<style type="text/css">
+  a {
+      color: #000;
+  }
+</style>
+{% endblock %}
+
+{% block body %}
+<section>
+  <center><span style="font-size:1.8em; font-weight: bold; ">Skema for {{ volunteer.name }}</span></center>
+  <div id='calendar'></div>
+</section>
+
+<section style="margin-top: 20px;">
+  <h1>Vagtliste</h1>
+  <table class="table">
+    <tr>
+      <th>Vagt</th>
+      <th>Dato og tid</th>
+      <th>Folk på vagten</th>
+    </tr>
+    
+    {% for shift in shifts %}
+    <tr>
+      <td>
+	{{ shift.title }}
+      </td>
+      <td>
+	{{ shift.starts|roddate }} &mdash; {{ shift.ends|hour }}
+      </td>
+      <td>
+	<small>
+	  {% for vol in shift.get_volunteers() %}
+
+	  {% if vol == volunteer %} <strong> {% endif %}
+	    <a href="/volunteer/{{vol.id}}">{{ vol.name }}</a> <br>
+	    {% if vol == volunteer %} </strong> {% endif %}
+	  {% endfor %}
+	</small>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
+{% endblock %}

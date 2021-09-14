@@ -17,9 +17,12 @@ def csv_streamer(filename):
 
 def get_shifts_from_csv():
     shifts = []
-    
+
     for line in csv_streamer('tjanser.csv'):
-        shifts.append(Shift(line))
+        s = Shift()
+        s.from_csv(line)
+        
+        shifts.append(s)
 
     return shifts
 

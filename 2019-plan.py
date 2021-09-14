@@ -1,7 +1,9 @@
 from model import Shift, Volunteer, VolunteerShiftRelation, ROD_DAYS
+from sanity import *
 from ortools.sat.python import cp_model
 
-COMMIT = True
+LOAD_PRESETS = False
+COMMIT = False
 
 # Load alle folk
 volunteers = list(Volunteer.select().execute())
@@ -16,7 +18,7 @@ for v, volunteer in enumerate(volunteers):
 total_hours_needed = sum([x.get_load()*x.num_people for x in shifts])
 total_hours_available = sum([x.hours_active() for x in volunteers])
 expected_load = total_hours_needed / total_hours_available
-
+load_deviation_tolerance = 0.013
 
 def resolve_volunteer(name):
     for v, volunteer in enumerate(volunteers):
@@ -31,9 +33,17 @@ print("Antal timer vi behøver:     %d timer" % total_hours_needed)
 print("Antal timer vi har:         %d timer" % total_hours_available)
 print("Forventet load:             %f" % (expected_load))
 
-min_load = expected_load-0.01
-max_load = expected_load+0.02
+print()
+print("Laver sanity checks...")
+SANITY_CHECKS = [#DoWeHaveEnoughPeopleForEveryShift,
+                 VolunteersDontEndBeforeTheyStart]
+for check in SANITY_CHECKS:
+    print (check.__name__)
+    if check() == False:
+        print("Fejlede sanity check.")
+        exit()
 
+print("OK!")
 model = cp_model.CpModel()
 
 shift_loads = [int(s.get_load()) for s in shifts]
@@ -47,18 +57,20 @@ for v, volunteer in enumerate(volunteers):
         work[v, s] = model.NewBoolVar('work%i_%i' % (v, s))
 
 
-print(" - Indsætter de nagelfaste tjansetildelinger (%d stk.)" % len(VolunteerShiftRelation.select().execute()) )
-for s, shift in enumerate(shifts):
-    for volunteer in shift.get_volunteers():
-        v = volunteers_inv[volunteer]
+if LOAD_PRESETS:
+    print(" - Indsætter de nagelfaste tjansetildelinger (%d stk.)" % len(VolunteerShiftRelation.select().execute()) )
+    for s, shift in enumerate(shifts):
+        for volunteer in shift.get_volunteers():
+            v = volunteers_inv[volunteer]
 
-        model.Add(work[v, s] == 1)
+            model.Add(work[v, s] == 1)
 
 # Assign n volunteers to each shift
 print(" - Ansæt passende antal folk pr. tjans")
 for v, volunteer in enumerate(volunteers):
     for s, shift in enumerate(shifts):
-        # sum af shifts == shift.num_people
+        #model.Add(sum(work[w, s] for w in range(len(volunteers))) > 0)
+
         if shift.num_people < 8:
             model.Add(sum(work[w, s] for w in range(len(volunteers))) == shift.num_people)
         else:
@@ -80,23 +92,52 @@ for s1, shift1 in enumerate(shifts):
                 model.Add(work[v, s1] + work[v, s2] <= 1)
 
 
-print(" - Alle har %.02f <= load <= %.02f" % (min_load, max_load))
+print(" - Alle har %.02f <= load <= %.02f" % (expected_load-load_deviation_tolerance, expected_load+load_deviation_tolerance))
 loads = []
+errors = []
 for v, volunteer in enumerate(volunteers):
+    error = model.NewIntVar(-1000000, 1000000, 'error_%i' % v)
+    abs_error = model.NewIntVar(0, 1000000, 'abs_error_%i' % v)
+    
     hours_worked = sum((shift_loads[s] * work[v, s]) for s in range(len(shifts)))
 
-    model.Add(1000 * hours_worked >= int(volunteer.hours_present() * volunteer.load_multiplier * (min_load * 1000) )) 
-    model.Add(1000 * hours_worked <= int(volunteer.hours_present() * volunteer.load_multiplier * (max_load * 1000) ))
-
-
-
+    if volunteer.load_multiplier == 1:
+        devtol = load_deviation_tolerance
+    else:
+        devtol = load_deviation_tolerance / volunteer.load_multiplier
     
+    #model.Add(1000 * hours_worked >= int(volunteer.hours_present() * volunteer.load_multiplier * ((expected_load - devtol) * 1000) )) 
+    #model.Add(1000 * hours_worked <= int(volunteer.hours_present() * volunteer.load_multiplier * ((expected_load + devtol) * 1000) ))
+
+    # dette virker ikke
+    # model.AddAbsEquality(error, 100000 * hours_worked - int(100000 * expected_load))
+
+    model.Add(
+        error == 10000 * hours_worked - int(10000 * volunteer.hours_present() * volunteer.load_multiplier * expected_load)
+    )
+    model.AddAbsEquality(abs_error, error)
+    errors.append(abs_error)
+
+# TODO: Minimize max(errors) - min(errors)
+max_error = model.NewIntVar(0, 1000000, 'max_error')
+min_error = model.NewIntVar(0, 1000000, 'max_error')
+
+model.AddMaxEquality(max_error, errors)
+model.AddMinEquality(max_error, errors)
+
+# Doesn't work
+# model.Minimize(max_error - min_error)
+
+
 # Everybody gets a bar shift
 print(" - Alle får mindst én bartjans og ingen får mere end to")
-print(" - Ingen står for morgenbrød mere end én gang")
+print(" - Ingen står for morgenbrød, toasts og natmad mere end én gang")
 for v, volunteer in enumerate(volunteers):
     bar_shifts = list()
     bread_shifts = list()
+    toast_shifts = list()
+    natmad_shifts = list()
+    
     for s, shift in enumerate(shifts):
         if shift.title == "Bar":
             bar_shifts.append(work[v, s])
@@ -104,16 +145,21 @@ for v, volunteer in enumerate(volunteers):
         if shift.title == "Morgenbrød":
             bread_shifts.append(work[v, s])
 
+        if shift.title == "Toasts":
+            toast_shifts.append(work[v, s])
+
+        if shift.title == "Natmad + opvask":
+            natmad_shifts.append(work[v, s])
+            
+
     model.Add(sum(bar_shifts) > 0)
     model.Add(sum(bar_shifts) <= 2)
 
     model.Add(sum(bread_shifts) <= 1)
 
+    model.Add(sum(toast_shifts) <= 1)
 
-    
-# TODO: minimize error expected load / actual load
-#model.Minimize(volunteer_max_load - volunteer_min_load)
-
+    model.Add(sum(natmad_shifts) <= 1)
 
 print(" - Folk arbejder med deres venner")
 happies = list()
@@ -128,9 +174,10 @@ for v, volunteer in enumerate(volunteers):
             happies.append((work[v, s] and work[f, s])) #.OnlyEnforceIf(work[v, s])
 
 
-print("   Antal happies: %d" % len(happies))
-model.Maximize(sum(happies))
 
+            
+print("   Antal happies: %d" % len(happies))
+# model.Maximize(sum(happies))
 
 
 print(" - Alexandra har ingen nattevagter")
@@ -152,14 +199,6 @@ for s, shift in enumerate(shifts):
         # There can be only one...
         model.Add(work[v, s] == 1)
 
-print(" - Kragen og Kamil er på opsætning")
-for s, shift in enumerate(shifts):
-    if shift.title == "Opsætning":        
-        v, kamil = resolve_volunteer("Kamil Dzielinski")
-        # There can be only one...
-        model.Add(work[v, s] == 1)
-
-
 print(" - Rasmus arbejder ikke søndag")
 r, rasmus = resolve_volunteer("Rasmus Brinck")
 for s, shift in enumerate(shifts):
@@ -171,6 +210,7 @@ print()
 print("Søger efter løsninger...")
 solver = cp_model.CpSolver()
 solver.parameters.num_search_workers = 4
+# solver.parameters.use_lns = 1
 
 solution_printer = cp_model.ObjectiveSolutionPrinter()
 status = solver.SolveWithSolutionCallback(model, solution_printer)
@@ -205,3 +245,6 @@ print('  - wall time       : %f s' % solver.WallTime())
 
 
 # model.Add(sum(work[v, s] for s in range(len(shifts))) <= 7)
+
+
+# kamil skal på nedtagning

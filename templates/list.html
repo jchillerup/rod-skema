@@ -1,0 +1,23 @@
+
+{% extends "base.html" %}
+{% block body %}
+<h1>Frivillige</h1>
+
+
+<table class="table">
+  <tr>
+    <th>Navn</th>
+    <th>Ankomst</th>
+    <th>Afrejse</th>
+  </tr>
+  {% for volunteer in volunteers %}
+  <tr>
+    <td>
+      <a href="/volunteer/{{ volunteer.id }}">{{ volunteer.name }}</a> <br>
+    </td>
+    <td> {{ volunteer.available_start|roddate }} </td>
+    <td> {{ volunteer.available_end|roddate }} </td>
+  </tr>
+{% endfor %}
+
+{% endblock %}

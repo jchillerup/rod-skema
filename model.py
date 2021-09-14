@@ -59,7 +59,7 @@ class Shift(Model):
 
     def find_candidates(self):
         cand = []
-        for v in Volunteer.select():
+        for v in Volunteer.select().order_by(Volunteer.name):
             if v.could_take(self):
                 cand.append(v)
         return cand
@@ -68,7 +68,7 @@ class Shift(Model):
         return Shift.select().where(Shift.id == sid)[0]
         
     def get_volunteers(self):
-        return Volunteer.select().join(VolunteerShiftRelation).where(VolunteerShiftRelation.shift == self)        
+        return Volunteer.select().join(VolunteerShiftRelation).where(VolunteerShiftRelation.shift == self).order_by(Volunteer.name)
     
     def collides_with(self, candidate):
         return check_range_collision(self.starts, self.ends, candidate.starts, candidate.ends)
@@ -236,8 +236,8 @@ class Volunteer(Model):
         return len(vsr) > 0
     
     def can_take(self, shift):
-        # return shift.starts >= self.available_start and shift.ends <= self.available_end
-        return check_range_collision(self.available_start, self.available_end, shift.starts, shift.ends) and shift.ends <= self.available_end and shift.starts >= self.available_start
+        return shift.starts >= self.available_start and shift.ends <= self.available_end
+        # return check_range_collision(self.available_start, self.available_end, shift.starts, shift.ends) and shift.ends <= self.available_end # and shift.starts >= self.available_start
         #return (self.available_start <= shift.starts) and (self.available_end >= shift.ends)
 
     def could_take(self, shift):

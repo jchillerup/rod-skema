@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style type="text/css">
+nav {
+display: none !important;
+}
+
+section.break {
+    page-break-before: always;
+}
+
+section {
+    page-break-inside: avoid;
+}
+</style>
+{% endblock %}
+{% block body %}
+
+{% set prevtitle = 'none' %}
+{% for shift in shifts %}
+
+{% if shift.title != shifts[loop.index-2].title %}
+<section class="break">
+{% else %}
+  <section>
+{% endif %}
+<h1>{{ shift.title }} {{ shift.starts|roddate }} &mdash; {{ shift.ends|hour }}</h1>
+
+<table class="table">
+  {% for volunteer in shift.get_volunteers() %}
+  <tr>
+    <td style="width: 80%;"> {{ volunteer.name }}</td>
+    <td>{{ volunteer.phone_number }}</td>
+  </tr>
+  {% endfor %}
+</table>
+</section>
+{% endfor %}
+
+{% endblock %}

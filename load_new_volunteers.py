@@ -6,5 +6,5 @@ for volunteer in v:
     try:
         volunteer.save()
         print("Added: %s " % volunteer)
-    except peewee.IntegrityError:
-        print("Had already: %s " % volunteer)
+    except peewee.IntegrityError as exc:
+        print(exc)

@@ -107,10 +107,14 @@ for shift in shifts:
 
 
 
-
+def variable_evaluator(a):
+    print("variable", a)
+                
+def value_evaluator(a, b):
+    print("value", a, b)
                 
 # decision builder
-db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_MIN_VALUE)
+db = solver.Phase(slots, solver.CHOOSE_FIRST_UNBOUND, solver.ASSIGN_RANDOM_VALUE)
 solver.Solve(db)
 
 

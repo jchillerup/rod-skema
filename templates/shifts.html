@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Hele vagtplanen</h1>
+
+<table class="table">
+  <tr>
+    <th>Dato og tid</th>
+    <th>Vagt</th>
+    <th>Folk på vagten</th>
+    <th>Telefon</th>
+  </tr>
+  
+  {% for shift in shifts %}
+  <tr>
+    <td>
+      {{ shift.starts|roddate }} &mdash; {{ shift.ends|roddate }}
+    </td>
+    <td>
+      {{ shift.title }}
+    </td>
+    <td>
+      {% for vol in shift.get_volunteers() %}
+      {{ vol.name }} <br>
+      {% endfor %}
+    </td>
+    <td>
+      {% for vol in shift.get_volunteers() %}
+      {{ vol.phone_number }} <br>
+      {% endfor %}
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,9 @@
+#+TITLE: Rod vagtplanlægning
+#+AUTHOR: Jens Christian Hillerup
+
+* Objektiver
+- Alle arbejder lige meget (med hensyn til load-faktorer)
+
+
+* Model
+- 
